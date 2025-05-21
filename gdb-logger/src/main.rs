@@ -44,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Connecting to GDB server on port {}...", config.gdb_port);
     gdb.raw_cmd(format!("target remote :{}", config.gdb_port))
         .await?;
+    println!("Connected to GDB server");
     // can insert breakpoints here
 
     gdb.set_timeout(wait_booting);

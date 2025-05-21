@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Register {
     Rax(u64), // 0
     Rbx(u64),
@@ -119,7 +119,7 @@ impl Register {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Frame {
     pub level: u32,
     pub address: u64,
@@ -140,7 +140,7 @@ impl From<gdbmi::frame::Frame> for Frame {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Variable {
     pub name: String,
     pub var_type: String,
@@ -159,7 +159,7 @@ impl From<gdbmi::variable::Variable> for Variable {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DebugInfo {
     pub regs: Vec<Register>,
     pub frame: Frame,

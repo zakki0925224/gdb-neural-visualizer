@@ -1,49 +1,52 @@
 use bevy::{color::palettes::css::*, prelude::*};
 use bevy_prototype_lyon::prelude::*;
-use bevy_slinet::{
-    ClientConfig,
-    client::{self, ClientPlugin},
-    packet_length_serializer::BigEndian,
-    protocols::udp::UdpProtocol,
-    serializer::SerializerAdapter,
-    serializers::bincode::{BincodeSerializer, DefaultOptions},
-};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-struct Config;
+use bevy_simple_networking::*;
+use gdb_logger::debug_info::DebugInfo;
+use std::net::{SocketAddr, UdpSocket};
 
-#[derive(Serialize, Deserialize, Debug)]
-enum ClientPacket {
-    String(String),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-enum ServerPacket {
-    String(String),
-}
-
-impl ClientConfig for Config {
-    type ClientPacket = ClientPacket;
-    type ServerPacket = ServerPacket;
-    type Protocol = UdpProtocol;
-    type SerializerError = bincode::Error;
-    type LengthSerializer = BigEndian<u8>;
-    fn build_serializer()
-    -> SerializerAdapter<Self::ServerPacket, Self::ClientPacket, Self::SerializerError> {
-        SerializerAdapter::ReadOnly(Arc::new(BincodeSerializer::<DefaultOptions>::default()))
-    }
-}
-
-fn main() {
-    let server_addr = "127.0.0.1:6666";
+fn main() -> anyhow::Result<()> {
+    let server_addr: SocketAddr = "127.0.0.1:6666".parse()?;
+    let socket = UdpSocket::bind("[::]:0")?;
+    socket.connect(server_addr)?;
+    socket.set_nonblocking(true)?;
 
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(ClientPlugin::<Config>::connect(server_addr))
-        .add_observer(client_packet_receive_system)
-        // .add_systems(Startup, startup)
-        // .add_systems(Update, update)
+        .insert_resource(SocketAddrResource::new(server_addr))
+        .insert_resource(UdpSocketResource::new(socket))
+        .add_plugins((DefaultPlugins, ClientPlugin))
+        .add_systems(Startup, udp_startup)
+        .add_systems(Update, udp_update)
+        .add_systems(Startup, startup)
         .run();
+
+    Ok(())
+}
+
+fn udp_startup(remote_addr: Res<SocketAddrResource>, mut transport: ResMut<Transport>) {
+    transport.send(**remote_addr, b"abc");
+}
+
+fn udp_update(mut events: EventReader<NetworkEvent>) {
+    for event in events.read() {
+        match event {
+            NetworkEvent::Message(_, bytes) => {
+                let json = String::from_utf8_lossy(bytes);
+                info!("{:?}", json);
+                match serde_json::from_str::<DebugInfo>(&json) {
+                    Ok(debug_info) => {
+                        info!("{:?}", debug_info);
+                    }
+                    _ => (),
+                }
+            }
+            NetworkEvent::Connected(socket_addr) => info!("Connected to {}", socket_addr),
+            NetworkEvent::Disconnected(socket_addr) => info!("Disconnected from {}", socket_addr),
+            NetworkEvent::RecvError(error) => error!("Receive error: {:?}", error),
+            NetworkEvent::SendError(error, message) => {
+                error!("Send error: {:?} for payload {:?}", error, message.payload)
+            }
+        }
+    }
 }
 
 fn startup(mut commands: Commands) {
@@ -67,16 +70,4 @@ fn startup(mut commands: Commands) {
             Stroke::new(BLACK, 10.0),
         ));
     }
-}
-
-fn client_packet_receive_system(new_packet: Trigger<client::PacketReceiveEvent<Config>>) {
-    match &new_packet.event().packet {
-        ServerPacket::String(s) => {
-            println!("Received string: {}", s);
-        }
-    }
-}
-
-fn update() {
-    println!("Updating...");
 }
