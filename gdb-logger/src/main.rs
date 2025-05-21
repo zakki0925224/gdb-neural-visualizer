@@ -1,12 +1,10 @@
 use config::Config;
 use core::time::Duration;
 use debug_info::{DebugInfo, Register};
-use futures_util::{SinkExt, StreamExt};
 use gdbmi::Gdb;
 use nix::libc::{SIGINT, kill};
 use std::{fs, process::Stdio};
-use tokio::{net::TcpListener, time::sleep};
-use tokio_tungstenite::tungstenite::Message;
+use tokio::{net::UdpSocket, time::sleep};
 
 mod config;
 mod debug_info;
@@ -19,14 +17,14 @@ async fn main() -> anyhow::Result<()> {
     let config: Config = toml::from_str(&fs::read_to_string(CONFIG_PATH)?)?;
     println!("Parsed configurations: {:?}", config);
 
-    // create ws server
-    let ws_listener = TcpListener::bind(format!("0.0.0.0:{}", config.ws_port)).await?;
-    println!("Waiting for WebSocket client on port {}...", config.ws_port);
+    // create udp server
+    let udp_addr = format!("0.0.0.0:{}", config.udp_port);
+    let udp_socket = UdpSocket::bind(&udp_addr).await?;
+    println!("Waiting for UDP client on port {}...", config.udp_port);
 
-    let (ws_stream, addr) = ws_listener.accept().await?;
-    println!("WebSocket client connected: {}", addr);
-    let ws_stream = tokio_tungstenite::accept_async(ws_stream).await?;
-    let (mut ws_sender, _) = ws_stream.split();
+    let mut buf = [0u8; 64];
+    let (_, client_addr) = udp_socket.recv_from(&mut buf).await?;
+    println!("UDP client connected: {}", client_addr);
 
     let duration = Duration::from_secs_f32(config.gdb_timeout);
     let wait_booting = Duration::from_secs_f32(config.gdb_timeout_wait_booting);
@@ -99,13 +97,12 @@ async fn main() -> anyhow::Result<()> {
         };
         let debug_info_json = serde_json::to_string(&debug_info)?;
 
-        // send to ws client
-        if ws_sender
-            .send(Message::Text(debug_info_json.into()))
+        // send to udp client
+        if let Err(e) = udp_socket
+            .send_to(debug_info_json.as_bytes(), &client_addr)
             .await
-            .is_err()
         {
-            println!("WebSocket send error");
+            println!("UDP send error: {}", e);
             break;
         }
 

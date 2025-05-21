@@ -1,0 +1,8 @@
+[package]
+name = "neural-visualizer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.15.0"
+bevy_prototype_lyon = "0.13.0"
