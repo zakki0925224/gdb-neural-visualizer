@@ -3,6 +3,9 @@ import javax.swing._
 import scala.concurrent.{Future, blocking}
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.net.{DatagramPacket, DatagramSocket, InetAddress}
+import play.api.libs.json.Json
+import data.DebugInfo
+import ui.NetworkPanel
 
 @main def main(): Unit = {
     UIManager.setLookAndFeel(new FlatLightLaf())
@@ -12,16 +15,24 @@ import java.net.{DatagramPacket, DatagramSocket, InetAddress}
     frame.setSize(600, 400)
 
     val panel = new JPanel()
-    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS))
+    panel.setLayout(new java.awt.BorderLayout())
 
     val logArea = new JTextArea(15, 50)
     logArea.setEditable(false)
-    val scrollPane = new JScrollPane(logArea)
 
+    val scrollPane    = new JScrollPane(logArea)
     val connectButton = new JButton("Connect")
 
-    panel.add(scrollPane)
-    panel.add(connectButton)
+    val networkPanel = new NetworkPanel()
+    networkPanel.setPreferredSize(new java.awt.Dimension(600, 400))
+
+    val topPanel = new JPanel()
+    topPanel.setLayout(new javax.swing.BoxLayout(topPanel, javax.swing.BoxLayout.Y_AXIS))
+    topPanel.add(scrollPane)
+    topPanel.add(connectButton)
+
+    panel.add(topPanel, java.awt.BorderLayout.NORTH)
+    panel.add(networkPanel, java.awt.BorderLayout.CENTER)
     frame.add(panel)
     frame.setVisible(true)
 
@@ -34,11 +45,21 @@ import java.net.{DatagramPacket, DatagramSocket, InetAddress}
             while (true) {
                 val packet = new DatagramPacket(buf, buf.length)
                 udpSocket.receive(packet)
-                val msg = new String(packet.getData, 0, packet.getLength, "UTF-8")
-                SwingUtilities.invokeLater(() => {
-                    logArea.append(s"[RECV ] $msg\n")
-                    logArea.setCaretPosition(logArea.getDocument.getLength)
-                })
+                val json = new String(packet.getData, 0, packet.getLength, "UTF-8")
+
+                try {
+                    val debugInfo = Json.parse(json).as[DebugInfo]
+                    SwingUtilities.invokeLater(() => {
+                        logArea.append(s"[RECV ] $debugInfo\n")
+                        logArea.setCaretPosition(logArea.getDocument.getLength)
+                        networkPanel.updateNetwork(debugInfo)
+                    })
+                } catch {
+                    case e: Exception =>
+                        SwingUtilities.invokeLater(() => {
+                            logArea.append(s"[ERROR] JSON parse error: ${e.getMessage}\n")
+                        })
+                }
             }
         } catch {
             case e: Exception =>
