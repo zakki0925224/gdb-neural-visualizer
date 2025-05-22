@@ -1,7 +1,3 @@
-# rust
-/target
-
-# scala
 *.class
 *.log
 
