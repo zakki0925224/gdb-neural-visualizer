@@ -1,4 +1,5 @@
 import com.formdev.flatlaf.FlatLightLaf
+import java.awt._
 import javax.swing._
 import scala.concurrent.{Future, blocking}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -14,26 +15,24 @@ import ui.NetworkPanel
     frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE)
     frame.setSize(600, 400)
 
-    val panel = new JPanel()
-    panel.setLayout(new java.awt.BorderLayout())
+    val topPanel = new JPanel(new BorderLayout())
 
-    val logArea = new JTextArea(15, 50)
+    val logArea = new JTextArea(5, 50)
     logArea.setEditable(false)
+    val logScrollPane = new JScrollPane(logArea)
+    topPanel.add(logScrollPane, BorderLayout.NORTH)
 
-    val scrollPane    = new JScrollPane(logArea)
     val connectButton = new JButton("Connect")
+    val buttonPanel   = new JPanel(new FlowLayout(FlowLayout.LEFT))
+    buttonPanel.add(connectButton)
+    topPanel.add(buttonPanel, BorderLayout.SOUTH)
 
     val networkPanel = new NetworkPanel()
-    networkPanel.setPreferredSize(new java.awt.Dimension(600, 400))
+    // networkPanel.setPreferredSize(new Dimension(600, 400))
+    val networkScrollPane = new JScrollPane(networkPanel)
+    topPanel.add(networkScrollPane, BorderLayout.CENTER)
 
-    val topPanel = new JPanel()
-    topPanel.setLayout(new javax.swing.BoxLayout(topPanel, javax.swing.BoxLayout.Y_AXIS))
-    topPanel.add(scrollPane)
-    topPanel.add(connectButton)
-
-    panel.add(topPanel, java.awt.BorderLayout.NORTH)
-    panel.add(networkPanel, java.awt.BorderLayout.CENTER)
-    frame.add(panel)
+    frame.add(topPanel)
     frame.setVisible(true)
 
     val udpSocket = new DatagramSocket()

@@ -21,11 +21,18 @@ class NetworkPanel extends JPanel {
 
     def updateNetwork(debugInfo: DebugInfo): Unit = {
         val fnName = debugInfo.frame.function.getOrElse("??")
-        val rand   = new Random()
-        val x      = nodeMargin + rand.nextInt(this.getWidth().max(1) - nodeMargin * 2)
-        val y      = nodeMargin + rand.nextInt(this.getHeight().max(1) - nodeMargin * 2)
+
+        val rand = new Random()
+        val x    = nodeMargin + rand.nextInt(this.getWidth().max(1) - nodeMargin * 2)
+        val y    = nodeMargin + rand.nextInt(this.getHeight().max(1) - nodeMargin * 2)
+
+        nodes.foreach({ case (_, node) =>
+            node.decrementAccessCount()
+        })
 
         val node = nodes.getOrElseUpdate(fnName, new Node(fnName, x, y))
+        node.incrementAccessCount()
+        node.incrementAccessCount()
         if (nodes.size > 1) {
             val prevNode = nodes.values.toSeq(nodes.size - 2)
             edges += new Edge(prevNode, node)
